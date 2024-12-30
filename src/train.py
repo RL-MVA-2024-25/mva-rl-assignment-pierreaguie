@@ -22,9 +22,29 @@ env = TimeLimit(
 # ENJOY!
 
 
+default_args = {
+    "hidden_dim": 500,
+    "n_hidden_layers": 5,
+
+    "lr": 1e-3,
+    "batch_size": 64,
+
+    "nb_gradient_steps": 5,
+    "update_target_freq": 200,
+
+    "capacity": 10000,
+
+    "gamma": .95,
+    "epsilon_max": 1.0,
+    "epsilon_min": 0.01,
+    "epsilon_stop": 10000,
+    "epsilon_delay": 100,
+}
+
+
 class ProjectAgent:
 
-    def __init__(self):
+    def __init__(self, args = default_args):
 
         self.env = env
         self.n_episodes_steps = self.env._max_episode_steps
@@ -32,28 +52,28 @@ class ProjectAgent:
         
         self.state_dim = self.env.observation_space.shape[0]
         self.n_actions = self.env.action_space.n
-        self.n_hidden_layers = 5
-        self.hidden_dim = 500
+        self.n_hidden_layers = args["n_hidden_layers"]
+        self.hidden_dim = args["hidden_dim"]
         self.device = torch.device("cuda" if torch.cuda.is_available() else ("mps" if torch.mps.is_available() else "cpu"))
         self.model = self.get_model(state_dim = self.state_dim, n_actions = self.n_actions, n_hidden_layers = self.n_hidden_layers, hidden_dim = self.hidden_dim).to(self.device)
         self.target_model = deepcopy(self.model).to(self.device)
 
-        self.lr = 1e-3
+        self.lr = args["lr"]
         self.optim = optim.Adam(self.model.parameters(), lr=self.lr)
         self.loss_fn = nn.SmoothL1Loss()
-        self.batch_size = 64
+        self.batch_size = args["batch_size"]
 
-        self.nb_gradient_steps = 5
-        self.update_target_freq = 200
+        self.nb_gradient_steps = args["nb_gradient_steps"]
+        self.update_target_freq = args["update_target_freq"]
 
-        self.capacity = 10000
+        self.capacity = args["capacity"]
         self.memory = ReplayBuffer(self.capacity, self.device)
 
-        self.gamma = .95
-        self.epsilon_max = 1.0
-        self.epsilon_min = 0.01
-        self.epsilon_stop = 10000
-        self.epsilon_delay = 100
+        self.gamma = args["gamma"]
+        self.epsilon_max = args["epsilon_max"]
+        self.epsilon_min = args["epsilon_min"]
+        self.epsilon_stop = args["epsilon_stop"]
+        self.epsilon_delay = args["epsilon_delay"]
         self.epsilon_step = (self.epsilon_max - self.epsilon_min) / self.epsilon_stop
 
 
@@ -71,14 +91,14 @@ class ProjectAgent:
 
 
     def load(self):
-        self.model.load_state_dict(torch.load("models/model.pth", map_location=self.device, weights_only=True))
+        self.model.load_state_dict(torch.load("models/best_model.pth", map_location=self.device, weights_only=True))
 
 
     def get_model(self, state_dim, n_actions, n_hidden_layers, hidden_dim):
         model = nn.Sequential()
         model.add_module("input", nn.Linear(state_dim, hidden_dim))
-        model.add_module("relu_0", nn.ReLU())
-        for i in range(1, n_hidden_layers + 1):
+        model.add_module("relu0", nn.ReLU())
+        for i in range(n_hidden_layers):
             model.add_module(f"hidden_{i}", nn.Linear(hidden_dim, hidden_dim))
             model.add_module(f"relu_{i}", nn.ReLU())
         model.add_module("output", nn.Linear(hidden_dim, n_actions))
