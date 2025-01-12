@@ -10,6 +10,7 @@ import random
 import matplotlib.pyplot as plt
 
 from copy import deepcopy
+import os
 
 env = TimeLimit(
     env=HIVPatient(domain_randomization=False), max_episode_steps=200
@@ -24,20 +25,20 @@ env = TimeLimit(
 
 default_args = {
     "hidden_dim": 500,
-    "n_hidden_layers": 5,
+    "n_hidden_layers": 5, # 5,
 
     "lr": 1e-3,
-    "batch_size": 64,
+    "batch_size": 128,
 
     "nb_gradient_steps": 5,
-    "update_target_freq": 200,
+    "update_target_freq": 400,
 
     "capacity": 10000,
 
-    "gamma": .95,
+    "gamma": .99,
     "epsilon_max": 1.0,
     "epsilon_min": 0.01,
-    "epsilon_stop": 10000,
+    "epsilon_stop": 20000,
     "epsilon_delay": 100,
 }
 
@@ -57,6 +58,7 @@ class ProjectAgent:
         self.device = torch.device("cuda" if torch.cuda.is_available() else ("mps" if torch.mps.is_available() else "cpu"))
         self.model = self.get_model(state_dim = self.state_dim, n_actions = self.n_actions, n_hidden_layers = self.n_hidden_layers, hidden_dim = self.hidden_dim).to(self.device)
         self.target_model = deepcopy(self.model).to(self.device)
+        self.target_model.eval()
 
         self.lr = args["lr"]
         self.optim = optim.Adam(self.model.parameters(), lr=self.lr)
@@ -109,7 +111,8 @@ class ProjectAgent:
         if len(self.memory) > self.batch_size:
             X, A, R, Y, D = self.memory.sample(self.batch_size)
             next_actions = self.model(Y).argmax(1).unsqueeze(1)
-            QYmax = self.target_model(Y).gather(1, next_actions).squeeze(1).detach()
+            with torch.no_grad():
+                QYmax = self.target_model(Y).gather(1, next_actions).squeeze(1).detach()
             update = R + self.gamma * QYmax * (1 - D)
             QXA = self.model(X).gather(1, A.to(torch.long).unsqueeze(1))
 
@@ -158,6 +161,7 @@ class ProjectAgent:
                 print(f"Episode {episode} - Reward: {episode_return[-1]:.3f}, epsilon: {epsilon}")
 
                 if episode_return[-1] > best_reward:
+                    print(f"New best reward: {episode_return[-1]}")
                     best_reward = episode_return[-1]
                     self.save("models/model.pth")
             else:
@@ -188,6 +192,8 @@ class ReplayBuffer:
     def __len__(self):
         return len(self.buffer)
     
+
+
 
 if __name__ == "__main__":
     agent = ProjectAgent()
