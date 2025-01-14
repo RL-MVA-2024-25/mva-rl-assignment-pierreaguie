@@ -7,10 +7,8 @@ import torch
 
 import numpy as np
 import random
-import matplotlib.pyplot as plt
 
 from copy import deepcopy
-import os
 
 env = TimeLimit(
     env=HIVPatient(domain_randomization=False), max_episode_steps=200
@@ -199,5 +197,3 @@ if __name__ == "__main__":
     agent = ProjectAgent()
     print(agent.device)
     rewards = agent.train()
-    plt.plot(rewards)
-    plt.show()
